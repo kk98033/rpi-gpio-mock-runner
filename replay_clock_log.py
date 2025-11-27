@@ -32,7 +32,7 @@ def render_display(state):
     return "\n".join(lines)
 
 def main():
-    with open("mock_log.json", "r", encoding="utf-8") as f:
+    with open("client_output.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
     logs = data["logs"]

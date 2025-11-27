@@ -26,15 +26,16 @@ def measure_distance():
     time.sleep(0.00001)
     GPIO.output(TRIG_y, False)
 
-    # 等待 ECHO_r 高電位，並記錄時間
+    # 先給初始值，避免迴圈沒跑導致變數不存在
+    pulse_start = time.time()
+    pulse_end = time.time()
+
     while GPIO.input(ECHO_r) == 0:
         pulse_start = time.time()
 
-    # 等待 ECHO_r 低電位，並記錄時間
     while GPIO.input(ECHO_r) == 1:
         pulse_end = time.time()
 
-    # 計算脈衝持續時間，轉換為距離（公分）
     pulse_duration = pulse_end - pulse_start
     distance = pulse_duration * 17150
     distance = round(distance, 2)
