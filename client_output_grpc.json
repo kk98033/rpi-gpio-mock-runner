@@ -1,0 +1,58 @@
+{
+  "status": "completed",
+  "lab_label": "hc-sr04",
+  "duration": 3.0,
+  "input_settings": {
+    "lab": "hc-sr04",
+    "duration": 3.0,
+    "distance": 80.0
+  },
+  "logs": [
+    {
+      "time": 0.026000000536441803,
+      "pin": 4,
+      "level": 0
+    },
+    {
+      "time": 0.026000000536441803,
+      "pin": 17,
+      "level": 0
+    },
+    {
+      "time": 0.026000000536441803,
+      "pin": 27,
+      "level": 0
+    },
+    {
+      "time": 0.5260000228881836,
+      "pin": 27,
+      "level": 0
+    },
+    {
+      "time": 0.5270000100135803,
+      "pin": 27,
+      "level": 0
+    },
+    {
+      "time": 0.5320000052452087,
+      "pin": 4,
+      "level": 0
+    },
+    {
+      "time": 0.5320000052452087,
+      "pin": 17,
+      "level": 0
+    },
+    {
+      "time": 1.531999945640564,
+      "pin": 4,
+      "level": 0
+    },
+    {
+      "time": 1.531999945640564,
+      "pin": 17,
+      "level": 0
+    }
+  ],
+  "server_stderr": "[HCSR04] Init: Trig=27, Echo=22, Dist=80.0\n[HCSR04] Trigger detected at 1764520437.4305\n"
+}
