@@ -3,3 +3,5 @@ client_output.json
 clock_output.log
 __pycache__/
 .history/
+venv/
+venv_linux/
