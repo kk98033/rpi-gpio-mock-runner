@@ -101,8 +101,9 @@ export const ApiDocs: React.FC<ApiDocsProps> = ({ isOpen, onClose }) => {
                                         <td className="p-3 font-mono text-yellow-400">string</td>
                                         <td className="p-3 text-gray-500">No</td>
                                         <td className="p-3">
-                                            Lab environment tag. Defaults to 'unknown'. <br />
-                                            Options: <code className="bg-gray-900 px-1 rounded">led</code>, <code className="bg-gray-900 px-1 rounded">clock</code>, <code className="bg-gray-900 px-1 rounded">buzzer</code>, <code className="bg-gray-900 px-1 rounded">hc-sr04</code>
+                                            Lab environment tag or comma-separated list of sensors. Defaults to 'unknown'. <br />
+                                            Options: <code className="bg-gray-900 px-1 rounded">led</code>, <code className="bg-gray-900 px-1 rounded">buzzer</code>, <code className="bg-gray-900 px-1 rounded">4seg</code>, <code className="bg-gray-900 px-1 rounded">ultrasonic</code> <br />
+                                            Example: <code className="bg-gray-900 px-1 rounded">led,buzzer</code>
                                         </td>
                                     </tr>
                                     <tr>
@@ -247,17 +248,14 @@ time.sleep(1)
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div>
-                                    <label className="block text-xs text-gray-500 mb-1">Lab Environment</label>
-                                    <select
+                                    <label className="block text-xs text-gray-500 mb-1">Lab / Sensors (comma-separated)</label>
+                                    <input
+                                        type="text"
                                         value={testLab}
                                         onChange={(e) => setTestLab(e.target.value)}
+                                        placeholder="e.g. led,buzzer"
                                         className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-cyan-500"
-                                    >
-                                        <option value="led">LED</option>
-                                        <option value="clock">7-Segment Clock</option>
-                                        <option value="buzzer">Buzzer</option>
-                                        <option value="hc-sr04">Ultrasonic (HC-SR04)</option>
-                                    </select>
+                                    />
                                 </div>
                                 <div className="flex gap-4">
                                     <div className="flex-1">

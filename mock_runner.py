@@ -21,8 +21,8 @@ def setup_devices(lab_label):
     """根據 lab 標籤載入對應的虛擬設備"""
     # 從環境變數讀取距離設定，預設 50cm
     dist = float(os.environ.get("MOCK_DISTANCE", 50))
-    
-    if lab_label == 'hc-sr04' or lab_label == 'ultrasonic':
+    print(lab_label)
+    if 'hc-sr04' in lab_label or 'ultrasonic' in lab_label:
         from devices.hc_sr04 import HCSR04
         # 這裡假設腳位是 TRIG=27, ECHO=22 (對應你的 hc-sr04.py)
         # 如果要更靈活，可以再透過環境變數傳入腳位

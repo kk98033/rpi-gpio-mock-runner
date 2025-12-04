@@ -14,7 +14,7 @@ type SimulationStep = 'CONFIG' | 'MAPPING' | 'PLAYBACK';
 
 function App() {
   const [code, setCode] = useState<string>('import RPi.GPIO as GPIO\nimport time\n\nGPIO.setmode(GPIO.BCM)\nGPIO.setup(17, GPIO.OUT)\n\nGPIO.output(17, GPIO.HIGH)\ntime.sleep(1)\nGPIO.output(17, GPIO.LOW)\n');
-  const [lab, setLab] = useState<string>('led');
+  const [selectedSensors, setSelectedSensors] = useState<string[]>(['led']);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [duration, setDuration] = useState<number>(5);
   const [distance, setDistance] = useState<number>(50); // For ultrasonic
@@ -49,7 +49,7 @@ function App() {
     try {
       const response = await axios.post('/api/simulate', {
         code,
-        lab,
+        lab: selectedSensors.join(','),
         duration: 5, // Default duration request, server might cap it
         distance
       });
@@ -119,8 +119,8 @@ function App() {
           <CodeEditor
             code={code}
             setCode={setCode}
-            lab={lab}
-            setLab={setLab}
+            selectedSensors={selectedSensors}
+            setSelectedSensors={setSelectedSensors}
             onRun={handleRunSimulation}
             isLoading={isLoading}
             duration={duration}
@@ -143,7 +143,7 @@ function App() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-gray-400 text-sm font-bold uppercase tracking-wider">Visualization Board</span>
               <div className="flex items-center gap-4">
-                <span className="text-xs text-gray-600 font-mono">Lab: {lab}</span>
+                <span className="text-xs text-gray-600 font-mono">Sensors: {selectedSensors.join(', ')}</span>
                 {step === 'PLAYBACK' && (
                   <button
                     onClick={() => setStep('MAPPING')}
@@ -166,7 +166,7 @@ function App() {
               />
             ) : (
               <Board
-                lab={lab}
+                selectedSensors={selectedSensors}
                 pinState={pinState}
                 distance={distance}
                 setDistance={setDistance}
