@@ -14,14 +14,15 @@ sys.modules['RPi.GPIO'] = GPIO
 logs = []
 start_time = time.time()
 active_devices = []  # 存放已啟用的虛擬設備
+used_pins = set()    # 存放已使用的 GPIO 腳位
 
 # === 3. 設備初始化邏輯 ===
 def setup_devices(lab_label):
     """根據 lab 標籤載入對應的虛擬設備"""
     # 從環境變數讀取距離設定，預設 50cm
     dist = float(os.environ.get("MOCK_DISTANCE", 50))
-    
-    if lab_label == 'hc-sr04' or lab_label == 'ultrasonic':
+    print(lab_label)
+    if 'hc-sr04' in lab_label or 'ultrasonic' in lab_label:
         from devices.hc_sr04 import HCSR04
         # 這裡假設腳位是 TRIG=27, ECHO=22 (對應你的 hc-sr04.py)
         # 如果要更靈活，可以再透過環境變數傳入腳位
@@ -43,6 +44,8 @@ def log_action(action, pin=None, value=None):
         "pin": pin,
         "value": value
     })
+    if pin is not None:
+        used_pins.add(pin)
 
 orig_output = GPIO.output
 def logged_output(pin, value):
@@ -60,6 +63,7 @@ GPIO.output = logged_output
 
 orig_input = GPIO.input
 def simulated_input(pin):
+    used_pins.add(pin)
     now = time.time()
     
     # 1. 問問看有沒有設備要負責這個腳位的 Input (例如超音波 ECHO)
@@ -72,7 +76,28 @@ def simulated_input(pin):
     return orig_input(pin)
 GPIO.input = simulated_input
 
-# === 5. PWM Hook (維持原樣) ===
+orig_setup = GPIO.setup
+def logged_setup(pin, mode, pull_up_down=None, initial=None):
+    # 支援 pin 為 list 或 tuple 的情況
+    if isinstance(pin, (list, tuple)):
+        for p in pin:
+            used_pins.add(p)
+    else:
+        used_pins.add(pin)
+        
+    # 呼叫原始 setup
+    # 注意：Mock.GPIO 的 setup 簽章可能略有不同，但通常支援這些參數
+    # 這裡簡單轉發，若 Mock.GPIO 不支援某些參數可能會報錯，但在 Mock 環境通常較寬鬆
+    kwargs = {}
+    if pull_up_down is not None:
+        kwargs['pull_up_down'] = pull_up_down
+    if initial is not None:
+        kwargs['initial'] = initial
+        
+    orig_setup(pin, mode, **kwargs)
+GPIO.setup = logged_setup
+
+# === 5. PWM Hook ===
 orig_pwm = GPIO.PWM
 class LoggedPWM(GPIO.PWM):
     def __init__(self, pin, freq):
@@ -82,6 +107,9 @@ class LoggedPWM(GPIO.PWM):
     def ChangeDutyCycle(self, duty):
         log_action("PWM.ChangeDutyCycle", self.pin, duty)
         super().ChangeDutyCycle(duty)
+    def ChangeFrequency(self, frequency):
+        log_action("PWM.ChangeFrequency", self.pin, frequency)
+        super().ChangeFrequency(frequency)
     def start(self, duty):
         log_action("PWM.start", self.pin, duty)
         super().start(duty)
@@ -122,6 +150,7 @@ if __name__ == "__main__":
             "lab": args.lab,
             "start_time": start_time,
             "duration": round(time.time() - start_time, 3),
+            "used_pins": sorted(list(used_pins)),
             "logs": logs
         }
         
