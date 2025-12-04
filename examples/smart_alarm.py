@@ -21,7 +21,7 @@ pwm_led = GPIO.PWM(LED_PIN, 100) # 100Hz
 pwm_running = False # 紀錄 PWM 是否正在執行
 
 def measure_distance():
-    """測量距離 (已包含修正後的邏輯)"""
+    """測量距離"""
     GPIO.output(TRIG_PIN, False)
     time.sleep(0.1) # 縮短冷卻時間加快反應
 

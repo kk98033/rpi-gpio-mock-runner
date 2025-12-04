@@ -5,38 +5,53 @@ import os
 import argparse
 import importlib.util
 
-# === 1. 匯入 Mock.GPIO 並替換系統模組 ===
+# === 匯入 Mock.GPIO 並替換系統模組 ===
 import Mock.GPIO as GPIO
 sys.modules['RPi'] = type(sys)('RPi')
 sys.modules['RPi.GPIO'] = GPIO
 
-# === 2. 全域變數 ===
+# === 全域變數 ===
 logs = []
 start_time = time.time()
 active_devices = []  # 存放已啟用的虛擬設備
 used_pins = set()    # 存放已使用的 GPIO 腳位
+MAX_DURATION = None  # 儲存最大執行時間
 
-# === 3. 設備初始化邏輯 ===
+# === 超時檢查函式 ===
+def check_timeout():
+    """檢查是否超過模擬時間，若超過則引發 SystemExit"""
+    if MAX_DURATION is not None:
+        if (time.time() - start_time) >= MAX_DURATION:
+            # 引發 SystemExit 會被外層的 try...except 捕捉，進而執行 finally
+            raise SystemExit("Simulation Timeout")
+
+# === 攔截 time.sleep 以便在睡眠中也能檢查超時 ===
+original_sleep = time.sleep
+def hb_sleep(seconds):
+    check_timeout() # 睡前檢查
+    original_sleep(seconds)
+    check_timeout() # 睡醒檢查
+time.sleep = hb_sleep
+
+# === 設備初始化邏輯 ===
 def setup_devices(lab_label):
     """根據 lab 標籤載入對應的虛擬設備"""
     # 從環境變數讀取距離設定，預設 50cm
     dist = float(os.environ.get("MOCK_DISTANCE", 50))
-    print(lab_label)
+    # print(lab_label) # Debug用，可註解
     if 'hc-sr04' in lab_label or 'ultrasonic' in lab_label:
         from devices.hc_sr04 import HCSR04
         # 這裡假設腳位是 TRIG=27, ECHO=22 (對應你的 hc-sr04.py)
-        # 如果要更靈活，可以再透過環境變數傳入腳位
         device = HCSR04(trig_pin=27, echo_pin=22, distance=dist)
         active_devices.append(device)
         print(f"[MockRunner] Loaded HC-SR04 (dist={dist}cm)")
 
     elif lab_label == 'led':
-        # LED 其實不需要特殊邏輯，因為只要看 Output Log 就好了
-        # 但如果要模擬按鈕輸入，就可以在這裡加 ButtonDevice
         pass
 
-# === 4. GPIO Hook 函式 (核心轉發邏輯) ===
+# === GPIO Hook 函式 (核心轉發邏輯) ===
 def log_action(action, pin=None, value=None):
+    check_timeout()  # 每次動作前檢查是否超時
     now = time.time() - start_time
     logs.append({
         "time": round(now, 3),
@@ -51,10 +66,10 @@ orig_output = GPIO.output
 def logged_output(pin, value):
     now = time.time()
     
-    # 1. 寫入 Log
+    # 寫入 Log
     log_action("GPIO.output", pin, value)
     
-    # 2. 通知所有設備 (例如觸發超音波 TRIG)
+    # 通知所有設備 (例如觸發超音波 TRIG)
     for device in active_devices:
         device.handle_output(pin, value, now)
         
@@ -63,21 +78,23 @@ GPIO.output = logged_output
 
 orig_input = GPIO.input
 def simulated_input(pin):
+    check_timeout() # [NEW]
     used_pins.add(pin)
     now = time.time()
     
-    # 1. 問問看有沒有設備要負責這個腳位的 Input (例如超音波 ECHO)
+    # 問問看有沒有設備要負責這個腳位的 Input (例如超音波 ECHO)
     for device in active_devices:
         result = device.handle_input(pin, now)
         if result is not None:
             return result
             
-    # 2. 沒有人認領，就回傳 Mock.GPIO 的預設值
+    # 沒有人認領，就回傳 Mock.GPIO 的預設值
     return orig_input(pin)
 GPIO.input = simulated_input
 
 orig_setup = GPIO.setup
 def logged_setup(pin, mode, pull_up_down=None, initial=None):
+    check_timeout() # [NEW]
     # 支援 pin 為 list 或 tuple 的情況
     if isinstance(pin, (list, tuple)):
         for p in pin:
@@ -85,9 +102,6 @@ def logged_setup(pin, mode, pull_up_down=None, initial=None):
     else:
         used_pins.add(pin)
         
-    # 呼叫原始 setup
-    # 注意：Mock.GPIO 的 setup 簽章可能略有不同，但通常支援這些參數
-    # 這裡簡單轉發，若 Mock.GPIO 不支援某些參數可能會報錯，但在 Mock 環境通常較寬鬆
     kwargs = {}
     if pull_up_down is not None:
         kwargs['pull_up_down'] = pull_up_down
@@ -101,6 +115,7 @@ GPIO.setup = logged_setup
 orig_pwm = GPIO.PWM
 class LoggedPWM(GPIO.PWM):
     def __init__(self, pin, freq):
+        check_timeout() # [NEW]
         super().__init__(pin, freq)
         self.pin = pin
         log_action("PWM.init", pin, freq)
@@ -118,13 +133,18 @@ class LoggedPWM(GPIO.PWM):
         super().stop()
 GPIO.PWM = LoggedPWM
 
-# === 6. 主程式執行 ===
+# === 主程式執行 ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("script", help="User script to run")
     # 接收 lab 參數，用來決定要載入哪些設備
     parser.add_argument("--lab", default="unknown", help="Lab label (e.g., led, hc-sr04)")
+    # 接收 duration 參數
+    parser.add_argument("--duration", type=float, default=None, help="Max simulation duration")
     args = parser.parse_args()
+
+    # 設定全域超時時間
+    MAX_DURATION = args.duration
 
     # 初始化設備
     setup_devices(args.lab)
@@ -137,11 +157,13 @@ if __name__ == "__main__":
         target = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(target)
     except SystemExit:
-        pass # 允許 sys.exit()
+        # 捕捉我們自己拋出的超時 (check_timeout)，或是使用者 sys.exit()
+        # 這算是正常結束的一種，讓我們能夠進入 finally 寫 log
+        print(f"[MockRunner] Stopped (Reason: SystemExit/Timeout)")
     except Exception as e:
-        # 捕捉使用者程式的錯誤，避免 Runner 崩潰，但要在 Log 中記錄嗎？
-        # 這裡選擇讓它拋出，讓 Server 端的 stderr 捕捉
-        raise e
+        # 捕捉使用者程式的錯誤，避免 Runner 崩潰
+        # 這裡印出錯誤讓 Server stderr 捕捉
+        print(f"[MockRunner] Script Error: {e}")
     finally:
         # 模擬結束，輸出 JSON
         output_file = "mock_log.json"
@@ -154,7 +176,9 @@ if __name__ == "__main__":
             "logs": logs
         }
         
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(result, f, indent=2)
-        
-        print(f"[MockRunner] Simulation finished. Log saved to {output_file}")
+        try:
+            with open(output_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2)
+            print(f"[MockRunner] Simulation finished. Log saved to {output_file}")
+        except Exception as e:
+            print(f"[MockRunner] Failed to write log: {e}")

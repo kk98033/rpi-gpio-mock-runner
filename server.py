@@ -5,6 +5,7 @@ import tempfile
 import subprocess
 import logging
 import signal
+import platform
 from flask import Flask, request, jsonify
 from colorama import init, Fore, Back, Style
 
@@ -13,7 +14,7 @@ init(autoreset=True)
 
 app = Flask(__name__)
 
-# Configure logging to be less verbose for Flask, we'll handle our own output
+# Configure logging to be less verbose for Flask
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -89,12 +90,14 @@ def simulate():
 
             # === 準備執行指令 ===
             
-            # 加入 --lab 參數
+            # 傳入 --duration 參數給 Runner
+            # 讓 Runner 自己控制何時優雅結束
             cmd = [
                 sys.executable, 
                 'mock_runner.py', 
                 'user_script.py',
-                '--lab', str(lab_label)
+                '--lab', str(lab_label),
+                '--duration', str(duration)
             ]
             
             # === 設定環境變數 ===
@@ -112,11 +115,22 @@ def simulate():
             )
 
             try:
-                # 等待程式執行 (blocking)
-                stdout, stderr = process.communicate(timeout=duration)
+                # 設定 Server 的等待時間比 Runner 內部時間長一點 (例如 +2秒)
+                # 這樣 Runner 會先觸發 "Simulation Timeout" 自己存檔離開
+                # Server 只有在 Runner 當機卡死時才會觸發這裡的 TimeoutExpired
+                server_wait_time = duration + 2.0
+                stdout, stderr = process.communicate(timeout=server_wait_time)
+                
             except subprocess.TimeoutExpired:
-                print(f"\n{Fore.YELLOW}[Timeout] Sending SIGINT...{Style.RESET_ALL}")
-                process.send_signal(signal.SIGINT)
+                # 如果跑到這裡，表示 Runner 連自己退出都失敗了，這時候才強制殺掉
+                print(f"\n{Fore.YELLOW}[Timeout] Hard killing process...{Style.RESET_ALL}")
+                
+                # 針對 Windows 的修正
+                if platform.system() == "Windows":
+                    process.terminate()
+                else:
+                    process.send_signal(signal.SIGINT)
+
                 try:
                     stdout, stderr = process.communicate(timeout=1)
                 except subprocess.TimeoutExpired:
@@ -124,7 +138,7 @@ def simulate():
                     stdout, stderr = process.communicate()
                     print(f"{Fore.RED}[Timeout] Process killed forcefully.{Style.RESET_ALL}")
 
-            # === 讀取結果 (修改重點) ===
+            # === 讀取結果 ===
             log_file = os.path.join(temp_dir, 'mock_log.json')
             
             # 印出 stderr 供伺服器除錯
@@ -137,19 +151,16 @@ def simulate():
                 with open(log_file, 'r', encoding='utf-8') as f:
                     result = json.load(f)
                 
-                # === 新增：將 User Input 資訊封裝進回傳 JSON ===
-                # 這樣前端就能看到原本設定的參數
+                # 補上 User Input 資訊
                 result['input_settings'] = {
                     "lab": lab_label,
-                    "duration": duration,  # 這是實際限制後的秒數
+                    "duration": duration,
                     "distance": mock_distance
                 }
                 
-                # 為了方便，這些也可以放在第一層 (看你習慣)
                 result['lab_label'] = lab_label
                 result['status'] = 'completed'
                 
-                # 放入 stderr
                 if stderr:
                     result['server_stderr'] = stderr
                 
@@ -162,7 +173,6 @@ def simulate():
                     "error": "No log generated.",
                     "details": stderr, 
                     "status": "failed",
-                    # 即使失敗也回傳原本的設定，方便除錯
                     "input_settings": {
                         "lab": lab_label,
                         "duration": duration,
