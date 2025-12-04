@@ -2,7 +2,13 @@ mock_log.json
 client_output.json
 clock_output.log
 __pycache__/
-.history/
+# Frontend
+node_modules/
+dist/
+.vite/
+frontend/.vite/
+
+# Python / Venv
 venv/
 venv_linux/
 venv_windows/

@@ -57,6 +57,26 @@ pip install Mock.GPIO colorama flask
 
 ---
 
+## 前端開發環境設定
+
+本專案包含一個 React 前端介面，用於視覺化模擬結果。
+
+1. 進入前端目錄：
+   ```bash
+   cd frontend
+   ```
+2. 安裝依賴：
+   ```bash
+   npm install
+   ```
+3. 啟動開發伺服器：
+   ```bash
+   npm run dev
+   ```
+4. 開啟瀏覽器訪問 `http://localhost:6969`。
+
+---
+
 ## 使用方式（本地執行）
 
 ### 1. 在桌機上執行你的樹莓派程式
@@ -258,3 +278,18 @@ python test_client.py examples/smart_alarm.py hc-sr04 2 5
   ]
 }
 ```
+
+---
+
+## 進階文件指南
+
+本專案包含多份詳細文件，針對不同需求提供說明：
+
+- **[Docker 使用指南](DOCKER_README.md)**：
+  說明如何使用 Docker 與 Docker Compose 來部署與執行模擬環境，解決跨平台相容性問題。
+
+- **[Smart Alarm 模擬指南](SMART_ALARM_README.md)**：
+  針對 `smart_alarm.py` 範例的詳細操作說明，包含如何設定環境變數來模擬不同距離情境。
+
+- **[API Client 範例指南](API_CLIENT_README.md)**：
+  說明如何使用 Python (`call_api_smart_alarm.py`) 透過 HTTP 請求呼叫模擬伺服器，適合想要整合自動化測試的開發者。
